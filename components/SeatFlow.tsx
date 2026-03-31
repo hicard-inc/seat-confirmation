@@ -1,14 +1,14 @@
 // components/SeatFlow.tsx
-// フロー制御コンポーネント: confirm → card → dealer → done の状態遷移を管理
+// フロー制御: select → confirm → card(interact/dealer) → done
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FlowStep, SeatInfo } from "@/lib/types";
+import { FlowStep, InteractionMode, SeatInfo } from "@/lib/types";
 import Overlay from "./Overlay";
 import ConfirmDialog from "./ConfirmDialog";
 import SeatCard from "./SeatCard";
-import DealerConfirm from "./DealerConfirm";
+import PatternSelect from "./PatternSelect";
 
 const DEFAULT_SEAT_INFO: SeatInfo = {
   playerNumber: 90,
@@ -21,14 +21,17 @@ const DEFAULT_SEAT_INFO: SeatInfo = {
 };
 
 export default function SeatFlow() {
-  const [step, setStep] = useState<FlowStep>("confirm");
+  const [step, setStep] = useState<FlowStep>("select");
+  const [interactionMode, setInteractionMode] =
+    useState<InteractionMode>("swipe");
+
+  const handleSelectMode = useCallback((mode: InteractionMode) => {
+    setInteractionMode(mode);
+    setStep("confirm");
+  }, []);
 
   const handleConfirm = useCallback(() => {
     setStep("card");
-  }, []);
-
-  const handleSwipeComplete = useCallback(() => {
-    setStep("dealer");
   }, []);
 
   const handleDealerApprove = useCallback(() => {
@@ -36,22 +39,31 @@ export default function SeatFlow() {
   }, []);
 
   const handleCancel = useCallback(() => {
-    setStep("confirm");
+    setStep("select");
   }, []);
 
-  // 成功画面: 2秒後に初期画面に戻る
+  // 成功画面: 2.5秒後にリセット
   useEffect(() => {
     if (step === "done") {
-      const timer = setTimeout(() => {
-        setStep("confirm");
-      }, 2500);
+      const timer = setTimeout(() => setStep("select"), 2500);
       return () => clearTimeout(timer);
     }
   }, [step]);
 
   return (
-    <div className="w-full h-[100dvh] max-w-[393px] mx-auto relative overflow-hidden bg-[#f7f7f8]">
+    <div className="w-full h-[100dvh] max-w-[393px] mx-auto relative overflow-hidden">
       <AnimatePresence mode="wait">
+        {step === "select" && (
+          <motion.div
+            key="select"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <PatternSelect onSelect={handleSelectMode} />
+          </motion.div>
+        )}
+
         {step === "confirm" && (
           <motion.div
             key="confirm"
@@ -77,21 +89,7 @@ export default function SeatFlow() {
           >
             <SeatCard
               seatInfo={DEFAULT_SEAT_INFO}
-              onSwipeComplete={handleSwipeComplete}
-              onCancel={handleCancel}
-            />
-          </motion.div>
-        )}
-
-        {step === "dealer" && (
-          <motion.div
-            key="dealer"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <DealerConfirm
-              seatInfo={DEFAULT_SEAT_INFO}
+              interactionMode={interactionMode}
               onDealerApprove={handleDealerApprove}
               onCancel={handleCancel}
             />
@@ -102,12 +100,11 @@ export default function SeatFlow() {
           <motion.div
             key="done"
             className="fixed inset-0 flex flex-col items-center justify-center"
-            style={{ backgroundColor: "rgba(8, 9, 11, 0.9)" }}
+            style={{ backgroundColor: "rgba(8, 9, 11, 0.95)" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            {/* 成功アニメーション */}
             <motion.div
               className="flex flex-col items-center gap-6"
               initial={{ scale: 0.5, opacity: 0 }}
@@ -116,7 +113,7 @@ export default function SeatFlow() {
             >
               {/* チェックマーク */}
               <motion.div
-                className="w-[100px] h-[100px] rounded-full bg-[#1B9E1D] flex items-center justify-center"
+                className="w-[100px] h-[100px] rounded-full bg-[#22C55E] flex items-center justify-center"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{
@@ -135,9 +132,6 @@ export default function SeatFlow() {
                   strokeWidth="3"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
                 >
                   <motion.path
                     d="M5 13l4 4L19 7"
@@ -157,7 +151,7 @@ export default function SeatFlow() {
                 着席が完了しました
               </motion.p>
               <motion.p
-                className="text-[rgba(255,255,255,0.6)] text-[14px] text-center"
+                className="text-[rgba(255,255,255,0.4)] text-[13px] text-center"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.7 }}
