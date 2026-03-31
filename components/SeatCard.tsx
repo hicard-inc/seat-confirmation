@@ -89,17 +89,19 @@ export default function SeatCard({
 }: SeatCardProps) {
   const [phase, setPhase] = useState<CardPhase>("interact");
   const [flipDistance, setFlipDistance] = useState(-500);
+  // スタッフ向けゲーム情報の位置（カード下端 + gap）
+  const [dealerInfoTop, setDealerInfoTop] = useState(260);
   const cardRef = useRef<HTMLDivElement>(null);
   const isSwipe = interactionMode === "swipe";
 
-  // カードの自然な位置からフリップ先までの距離を計算
+  // カードの自然な位置からフリップ先（画面上部 top:16px）までの距離を計算
   useEffect(() => {
     const calculate = () => {
       const h = window.innerHeight;
-      const cardHeight = cardRef.current?.offsetHeight || 180;
+      const cardHeight = cardRef.current?.offsetHeight || 220;
       const bottomOffset = 72;
       const naturalTop = h - bottomOffset - cardHeight;
-      const targetTop = 60;
+      const targetTop = 16;
       setFlipDistance(targetTop - naturalTop);
     };
     // レイアウト確定後に計算
@@ -113,9 +115,12 @@ export default function SeatCard({
 
   const triggerFlip = useCallback(() => {
     const h = window.innerHeight;
-    const cardHeight = cardRef.current?.offsetHeight || 180;
+    const cardHeight = cardRef.current?.offsetHeight || 220;
     const naturalTop = h - 72 - cardHeight;
-    setFlipDistance(60 - naturalTop);
+    const newDist = 16 - naturalTop;
+    setFlipDistance(newDist);
+    // スタッフ向けゲーム情報をカード下端 + 20px に配置
+    setDealerInfoTop(16 + cardHeight + 20);
     setPhase("dealer");
   }, []);
 
@@ -140,7 +145,7 @@ export default function SeatCard({
   return (
     <div
       className="fixed inset-0"
-      style={{ backgroundColor: "rgba(8, 9, 11, 0.95)", perspective: "1200px" }}
+      style={{ backgroundColor: "rgba(8, 9, 11, 0.95)", perspective: "800px" }}
     >
       {/* ゲーム情報ヘッダー（プレイヤー向け） */}
       <AnimatePresence>
@@ -173,15 +178,15 @@ export default function SeatCard({
         )}
       </AnimatePresence>
 
-      {/* ゲーム情報（スタッフ向け・180度回転） */}
+      {/* ゲーム情報（スタッフ向け・180度回転）カード直下に配置 */}
       <AnimatePresence>
         {phase === "dealer" && (
           <motion.div
             className="absolute left-0 right-0 flex flex-col items-center"
-            style={{ top: 280, rotate: 180 }}
+            style={{ top: dealerInfoTop, rotate: 180 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.4 }}
+            transition={{ delay: 0.3, duration: 0.35 }}
           >
             <h2 className="text-white text-[22px] font-black tracking-tight">
               {seatInfo.gameTitle}
@@ -204,15 +209,11 @@ export default function SeatCard({
         )}
       </AnimatePresence>
 
-      {/* シートカード（3Dフリップ） */}
+      {/* シートカード（3Dフリップアニメーション → rotate:180で静止） */}
       <motion.div
         ref={cardRef}
         className="absolute left-1/2 bottom-[72px] w-[361px] max-w-[calc(100vw-32px)]"
-        style={{
-          x: "-50%",
-          touchAction: "none",
-          transformStyle: "preserve-3d",
-        }}
+        style={{ x: "-50%", touchAction: "none" }}
         drag={phase === "interact" && isSwipe ? "y" : false}
         dragConstraints={{ top: -250, bottom: 0 }}
         dragElastic={0.15}
@@ -220,12 +221,26 @@ export default function SeatCard({
         initial={{ y: 40, opacity: 0 }}
         animate={{
           y: phase === "dealer" ? flipDistance : 0,
-          rotateX: phase === "dealer" ? 180 : 0,
+          // rotateZ(180) = 物理的に180度回転（スタッフ向け）
+          rotate: phase === "dealer" ? 180 : 0,
+          // 3D効果: 飛行中に前後に傾くキーフレーム（最終は0に戻る）
+          rotateX: phase === "dealer" ? [0, 30, 0] : 0,
           opacity: 1,
         }}
         transition={
           phase === "dealer"
-            ? { type: "spring", damping: 25, stiffness: 80, mass: 1.2 }
+            ? {
+                // y と rotate は同じspringで統一感を出す
+                y: { type: "spring", damping: 22, stiffness: 140 },
+                rotate: { type: "spring", damping: 22, stiffness: 140 },
+                // 3D傾きはduration-basedで先に完了させる
+                rotateX: {
+                  duration: 0.42,
+                  ease: [0.4, 0, 0.2, 1],
+                  times: [0, 0.45, 1],
+                },
+                opacity: { duration: 0.05 },
+              }
             : { type: "spring", damping: 28, stiffness: 260 }
         }
       >
@@ -322,9 +337,9 @@ export default function SeatCard({
         {phase === "dealer" && (
           <motion.div
             className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1 py-12 text-center"
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.4 }}
+            transition={{ delay: 0.28, duration: 0.3 }}
           >
             <p className="text-white text-[24px] font-bold leading-normal">
               この画面のまま
