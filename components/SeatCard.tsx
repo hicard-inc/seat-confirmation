@@ -102,7 +102,7 @@ function SwipeChevrons() {
   );
 }
 
-// タップ用波紋アニメーション
+// タップ用波紋アニメーション + TAP HERE テキスト
 function TapRipple({ onTap }: { onTap: () => void }) {
   return (
     <button
@@ -124,6 +124,9 @@ function TapRipple({ onTap }: { onTap: () => void }) {
           }}
         />
       ))}
+      <span className="text-[11px] font-bold tracking-[1.5px] uppercase text-[rgba(8,9,11,0.3)]">
+        TAP HERE
+      </span>
     </button>
   );
 }
@@ -306,9 +309,10 @@ export default function SeatCard({
 
         {/* ---- バック面: スタッフ向け（Figmaデザイン準拠） ----
             transform: rotateX(180deg) rotate(180deg)
-            外側の rotateX(180) と相殺 → net = rotate(180) でFigma通りの表示 */}
+            外側の rotateX(180) と相殺 → net = rotate(180) でFigma通りの表示
+            bottom-0: コンテンツ高さのみ確保。rotateX後にビジュアル上部へ配置される */}
         <div
-          className="absolute inset-0 bg-white rounded-[24px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
+          className="absolute bottom-0 left-0 right-0 bg-white rounded-[24px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
           style={{
             backfaceVisibility: "hidden",
             transform: "rotateX(180deg) rotate(180deg)",
