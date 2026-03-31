@@ -1,5 +1,5 @@
 // components/SeatCard.tsx
-// 画面2: シートカード + スワイプ/タップ操作 → ディーラー確認（連続フリップアニメーション）
+// 画面2: シートカード + スワイプ/タップ操作 → スタッフ確認（3Dフリップアニメーション）
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -14,6 +14,72 @@ interface SeatCardProps {
 }
 
 type CardPhase = "interact" | "dealer";
+
+// スワイプ用シェブロンSVG（2段重ね・順次カラーアニメーション）
+function SwipeChevrons() {
+  return (
+    <div className="flex flex-col items-center pb-1">
+      {/* 上のシェブロン（遅延して色が変わる） */}
+      <motion.div
+        className="-mb-1"
+        animate={{ opacity: [0.15, 0.6, 0.15] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
+      >
+        <svg width="24" height="14" viewBox="0 0 24 14" fill="none">
+          <path
+            d="M2 12L12 2L22 12"
+            stroke="rgba(8,9,11,0.8)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </motion.div>
+      {/* 下のシェブロン（先に色が変わる） */}
+      <motion.div
+        animate={{ opacity: [0.15, 0.6, 0.15] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <svg width="24" height="14" viewBox="0 0 24 14" fill="none">
+          <path
+            d="M2 12L12 2L22 12"
+            stroke="rgba(8,9,11,0.8)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </motion.div>
+    </div>
+  );
+}
+
+// タップ用波紋アニメーション
+function TapRipple({ onTap }: { onTap: () => void }) {
+  return (
+    <button
+      onClick={onTap}
+      className="relative w-[120px] h-[120px] rounded-full flex items-center justify-center"
+      style={{ border: "1px solid rgba(8,9,11,0.1)" }}
+    >
+      {/* 波紋エフェクト（3重リング） */}
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="absolute inset-0 rounded-full"
+          style={{ border: "1px solid rgba(8,9,11,0.08)" }}
+          animate={{ scale: [1, 1.6 + i * 0.3], opacity: [0.4, 0] }}
+          transition={{
+            duration: 2.4,
+            repeat: Infinity,
+            ease: "easeOut",
+            delay: i * 0.6,
+          }}
+        />
+      ))}
+    </button>
+  );
+}
 
 export default function SeatCard({
   seatInfo,
@@ -74,7 +140,7 @@ export default function SeatCard({
   return (
     <div
       className="fixed inset-0"
-      style={{ backgroundColor: "rgba(8, 9, 11, 0.95)" }}
+      style={{ backgroundColor: "rgba(8, 9, 11, 0.95)", perspective: "1200px" }}
     >
       {/* ゲーム情報ヘッダー（プレイヤー向け） */}
       <AnimatePresence>
@@ -107,7 +173,7 @@ export default function SeatCard({
         )}
       </AnimatePresence>
 
-      {/* ゲーム情報（ディーラー向け・180度回転） */}
+      {/* ゲーム情報（スタッフ向け・180度回転） */}
       <AnimatePresence>
         {phase === "dealer" && (
           <motion.div
@@ -138,11 +204,15 @@ export default function SeatCard({
         )}
       </AnimatePresence>
 
-      {/* シートカード */}
+      {/* シートカード（3Dフリップ） */}
       <motion.div
         ref={cardRef}
         className="absolute left-1/2 bottom-[72px] w-[361px] max-w-[calc(100vw-32px)]"
-        style={{ x: "-50%", touchAction: "none" }}
+        style={{
+          x: "-50%",
+          touchAction: "none",
+          transformStyle: "preserve-3d",
+        }}
         drag={phase === "interact" && isSwipe ? "y" : false}
         dragConstraints={{ top: -250, bottom: 0 }}
         dragElastic={0.15}
@@ -150,7 +220,7 @@ export default function SeatCard({
         initial={{ y: 40, opacity: 0 }}
         animate={{
           y: phase === "dealer" ? flipDistance : 0,
-          rotateZ: phase === "dealer" ? 180 : 0,
+          rotateX: phase === "dealer" ? 180 : 0,
           opacity: 1,
         }}
         transition={
@@ -161,7 +231,7 @@ export default function SeatCard({
       >
         <div className="bg-white rounded-[24px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
           {/* シート情報 */}
-          <div className="h-[90px] flex items-center px-6">
+          <div className="flex items-center pl-4 pr-6 py-4">
             {/* プレイヤー番号 */}
             <div
               className="w-[76px] h-[76px] rounded-full flex items-center justify-center flex-shrink-0"
@@ -173,15 +243,15 @@ export default function SeatCard({
             </div>
 
             {/* テーブル名 */}
-            <div className="ml-4 flex-1 min-w-0">
+            <div className="ml-6 flex-1 min-w-0">
               <p
-                className="text-[10px] tracking-wider uppercase"
+                className="text-[12px] tracking-[0.5px] uppercase leading-[15px]"
                 style={{ color: "rgba(8,9,11,0.35)" }}
               >
                 Table
               </p>
               <p
-                className="text-[36px] font-bold leading-tight"
+                className="text-[36px] font-bold leading-[45px]"
                 style={{ color: seatInfo.tableColor }}
               >
                 {seatInfo.tableName}
@@ -191,69 +261,55 @@ export default function SeatCard({
             {/* シート番号 */}
             <div className="text-right">
               <p
-                className="text-[10px] tracking-wider uppercase"
+                className="text-[12px] tracking-[0.5px] uppercase leading-[15px]"
                 style={{ color: "rgba(8,9,11,0.35)" }}
               >
                 Seat No.
               </p>
-              <p className="text-[36px] font-bold text-[#16161B] leading-tight">
+              <p className="text-[36px] font-bold text-[#16161B] leading-[45px]">
                 {seatInfo.seatNumber}
               </p>
             </div>
           </div>
 
-          {/* 下部セクション: インタラクト or ディーラーボタン */}
+          {/* 下部セクション: インタラクト or スタッフボタン */}
           {phase === "interact" ? (
-            <div className="px-6 pb-5 pt-2">
+            <div className="px-6 pb-6 flex flex-col items-center gap-4">
               {isSwipe ? (
-                <div className="flex flex-col items-center gap-2 py-2">
-                  <motion.div
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{
-                      duration: 1.8,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
+                <>
+                  {/* スワイプ用: 120px円 + 2段シェブロン */}
+                  <div
+                    className="w-[120px] h-[120px] rounded-full flex items-center justify-center"
+                    style={{ border: "1px solid rgba(8,9,11,0.1)" }}
                   >
-                    <svg
-                      width="24"
-                      height="14"
-                      viewBox="0 0 24 14"
-                      fill="none"
-                    >
-                      <path
-                        d="M2 12L12 2L22 12"
-                        stroke="rgba(8,9,11,0.18)"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </motion.div>
-                  <p className="text-[13px] font-medium text-[rgba(8,9,11,0.3)]">
-                    上にスワイプして着席
+                    <SwipeChevrons />
+                  </div>
+                  <p className="text-[12px] font-medium text-[rgba(8,9,11,0.3)]">
+                    上にスワイプしてスタッフに見せる
                   </p>
-                </div>
+                </>
               ) : (
-                <button
-                  onClick={triggerFlip}
-                  className="w-full bg-[#08090B] text-white rounded-full py-3.5 text-[15px] font-bold
-                             active:scale-[0.98] transition-transform"
-                >
-                  着席する
-                </button>
+                <>
+                  {/* タップ用: 120px円 + 波紋アニメーション */}
+                  <TapRipple onTap={triggerFlip} />
+                  <p className="text-[12px] font-medium text-[rgba(8,9,11,0.3)]">
+                    タップしてスタッフに見せる
+                  </p>
+                </>
               )}
             </div>
           ) : (
-            <div className="px-6 pb-5 pt-2">
+            <div className="px-6 pb-6">
               <button
                 onClick={onDealerApprove}
-                className="w-full bg-[#08090B] text-white rounded-full py-3.5 flex flex-col items-center
+                className="w-full bg-black text-white rounded-full py-4 flex flex-col items-center gap-1
                            active:scale-[0.98] transition-transform"
               >
-                <span className="text-[15px] font-bold">私はスタッフです</span>
-                <span className="text-[13px] mt-0.5 text-[rgba(255,255,255,0.6)]">
+                <span className="text-[16px] font-bold leading-[24px]">
                   着席を許可する
+                </span>
+                <span className="text-[12px] leading-[14px]">
+                  スタッフが操作してください
                 </span>
               </button>
             </div>
@@ -261,40 +317,44 @@ export default function SeatCard({
         </div>
       </motion.div>
 
-      {/* プレイヤー向けメッセージ（ディーラー確認時） */}
+      {/* プレイヤー向けメッセージ（スタッフ確認時） */}
       <AnimatePresence>
         {phase === "dealer" && (
           <motion.div
-            className="absolute left-0 right-0 flex flex-col items-center"
-            style={{ top: "60%" }}
+            className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1 py-12 text-center"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.4 }}
           >
-            <p className="text-white text-[20px] font-bold text-center leading-relaxed">
+            <p className="text-white text-[24px] font-bold leading-normal">
               この画面のまま
               <br />
               スタッフにお見せください
             </p>
-            <p className="text-[rgba(255,255,255,0.3)] text-[12px] mt-2">
-              Show this screen to the staff
+            <p className="text-[rgba(255,255,255,0.4)] text-[14px] font-medium">
+              Show this screen to staff
             </p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* キャンセルボタン */}
-      <motion.button
-        className="absolute left-1/2 bottom-6 text-[rgba(255,255,255,0.4)] text-[14px] font-medium py-2 px-6
-                   active:text-[rgba(255,255,255,0.6)] transition-colors"
-        style={{ x: "-50%" }}
-        onClick={handleCancel}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-      >
-        キャンセル
-      </motion.button>
+      {/* キャンセルボタン（インタラクト時のみ表示） */}
+      <AnimatePresence>
+        {phase === "interact" && (
+          <motion.button
+            className="absolute left-1/2 bottom-6 text-[rgba(255,255,255,0.4)] text-[14px] font-medium py-2 px-6
+                       active:text-[rgba(255,255,255,0.6)] transition-colors"
+            style={{ x: "-50%" }}
+            onClick={handleCancel}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            キャンセル
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
