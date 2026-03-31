@@ -5,7 +5,13 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { motion, AnimatePresence, PanInfo } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  PanInfo,
+  useMotionValue,
+  useTransform,
+} from "framer-motion";
 import { SeatInfo, InteractionMode } from "@/lib/types";
 
 interface SeatCardProps {
@@ -144,6 +150,21 @@ export default function SeatCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const isSwipe = interactionMode === "swipe";
 
+  // rotateX の進行値を追跡し、各面のopacityを確実に制御する
+  // backfaceVisibility: hidden だけではSafariで効かないケースがあるため
+  const rotateXProgress = useMotionValue(0);
+  // 90°を境に切り替え（カードが真横になる瞬間なので切り替えが視認できない）
+  const frontFaceOpacity = useTransform(
+    rotateXProgress,
+    [0, 88, 92, 180],
+    [1, 1, 0, 0]
+  );
+  const backFaceOpacity = useTransform(
+    rotateXProgress,
+    [0, 88, 92, 180],
+    [0, 0, 1, 1]
+  );
+
   // カードの自然な位置から画面上部（top:16px）までの移動量を計算
   useEffect(() => {
     const calculate = () => {
@@ -270,6 +291,12 @@ export default function SeatCard({
           rotateX: phase === "dealer" ? 180 : 0,
           opacity: 1,
         }}
+        onUpdate={(latest) => {
+          // rotateXの進行をtrackし、各面opacityの切り替えに使用
+          if (typeof latest.rotateX === "number") {
+            rotateXProgress.set(Math.abs(latest.rotateX));
+          }
+        }}
         transition={
           phase === "dealer"
             ? { type: "spring", damping: 22, stiffness: 140 }
@@ -277,9 +304,13 @@ export default function SeatCard({
         }
       >
         {/* ---- フロント面: プレイヤー向け ---- */}
-        <div
+        <motion.div
           className="bg-white rounded-[24px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
-          style={{ backfaceVisibility: "hidden" }}
+          style={{
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            opacity: frontFaceOpacity,
+          }}
         >
           <SeatInfoRow seatInfo={seatInfo} />
 
@@ -305,17 +336,19 @@ export default function SeatCard({
               </>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* ---- バック面: スタッフ向け（Figmaデザイン準拠） ----
             transform: rotateX(180deg) rotate(180deg)
             外側の rotateX(180) と相殺 → net = rotate(180) でFigma通りの表示
             bottom-0: コンテンツ高さのみ確保。rotateX後にビジュアル上部へ配置される */}
-        <div
+        <motion.div
           className="absolute bottom-0 left-0 right-0 bg-white rounded-[24px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
           style={{
             backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
             transform: "rotateX(180deg) rotate(180deg)",
+            opacity: backFaceOpacity,
           }}
         >
           <SeatInfoRow seatInfo={seatInfo} />
@@ -334,7 +367,7 @@ export default function SeatCard({
               </span>
             </button>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
 
       {/* プレイヤー向けメッセージ（スタッフ確認時・画面下部） */}
