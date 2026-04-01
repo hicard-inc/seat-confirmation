@@ -69,14 +69,14 @@ function SeatInfoRow({ seatInfo }: { seatInfo: SeatInfo }) {
   );
 }
 
-// スワイプ用シェブロン（2段・下から順に明るくなるアニメーション）
+// スワイプ用シェブロン（2段・下から順に浮き上がるアニメーション）
 function SwipeChevrons() {
   return (
     <div className="flex flex-col items-center pb-1">
       {/* 上のシェブロン（遅延あり） */}
       <motion.div
         className="-mb-1"
-        animate={{ opacity: [0.15, 0.6, 0.15] }}
+        animate={{ opacity: [0.15, 0.7, 0.15], y: [4, -4, 4] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
       >
         <svg width="24" height="14" viewBox="0 0 24 14" fill="none">
@@ -89,9 +89,9 @@ function SwipeChevrons() {
           />
         </svg>
       </motion.div>
-      {/* 下のシェブロン（先に明るくなる） */}
+      {/* 下のシェブロン（先に浮き上がる） */}
       <motion.div
-        animate={{ opacity: [0.15, 0.6, 0.15] }}
+        animate={{ opacity: [0.15, 0.7, 0.15], y: [4, -4, 4] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
       >
         <svg width="24" height="14" viewBox="0 0 24 14" fill="none">
@@ -353,7 +353,7 @@ export default function SeatCard({
         >
           <SeatInfoRow seatInfo={seatInfo} />
 
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-4">
             <button
               onClick={onDealerApprove}
               className="w-full bg-black text-white rounded-full py-4 flex flex-col items-center gap-1
@@ -365,6 +365,13 @@ export default function SeatCard({
               <span className="text-[12px] leading-[14px]">
                 スタッフが操作してください
               </span>
+            </button>
+            <button
+              onClick={handleCancel}
+              className="w-full py-3 mt-1 text-[14px] font-medium text-[rgba(8,9,11,0.35)]
+                         active:text-[rgba(8,9,11,0.5)] transition-colors"
+            >
+              キャンセル
             </button>
           </div>
         </motion.div>
