@@ -38,3 +38,16 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ---
 最終更新: 2026年03月31日
+
+## push前チェック（clone後に1回だけ設定が必要）
+
+clone したら、次を1回だけ実行してください。**これを忘れるとチェックが効きません。**
+
+```sh
+git config core.hooksPath hooks
+```
+
+push 前に `hooks/check_secrets.py` が走り、APIキー・トークン・秘密鍵の混入と
+`main` への直接 push を止めます。緊急時は `git push --no-verify` で回避できます。
+
+例示としてどうしても鍵に見える文字列を書くときは、同じ行に `ci:allow-secret` と理由を添えてください。
