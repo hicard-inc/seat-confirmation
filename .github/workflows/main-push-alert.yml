@@ -1,0 +1,79 @@
+# main への直push検知 — 配布元は hicard の tools/github_ci/
+#
+# なぜ「禁止」ではなく「検知」なのか:
+#   main 直push を**サーバ側で止める**には Branch protection / Ruleset が必要で、
+#   GitHub Free の private リポジトリでは API レベルで拒否される（403 Upgrade to GitHub Pro）。
+#   止められないので、起きたことに必ず気づく形（Issue + 赤いチェック）に振り替える。
+#   ローカルの hooks/pre-push も直pushを拒否するが、hook 未設定・--no-verify では効かない。
+#
+# 誤検知しない理由:
+#   PR のマージコミット（squash / merge / rebase いずれも）は GitHub 上でその PR に
+#   紐づくため /commits/{sha}/pulls が1件以上返る。PR 経由なら通知しない。
+#
+# 無効化のしかた（巻き戻し）: このファイルを削除するか、Actions タブで workflow を disable する。
+name: main direct push alert
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR を経由していない push を検知する
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # コミットメッセージ・実行者名は ${{ }} でスクリプトへ直接埋め込まず env 経由で渡す
+          # （任意の文字列が入るため、シェルに解釈させない）
+          ACTOR: ${{ github.actor }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMPARE_URL: ${{ github.event.compare }}
+        run: |
+          set -euo pipefail
+
+          pr_count=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq 'length')
+          if [ "${pr_count}" -gt 0 ]; then
+            echo "PR 経由のマージです（関連PR ${pr_count}件）。通知しません。"
+            exit 0
+          fi
+
+          echo "PR を経由しない main への直pushを検知しました。Issue を作成します。"
+
+          # YAML のブロックスカラー内でヒアドキュメントは使えない（本文を字下げできず構文が壊れる）。
+          # printf に1行ずつ渡して組み立てる。
+          {
+            printf '%s\n' '`main` へ PR を経由しない push が行われました。**この Workflow は push を止められません**（検知のみ）。'
+            printf '%s\n' ''
+            printf '%s\n' 'GitHub Free の private リポジトリでは Branch protection / Ruleset が使えないため、'
+            printf '%s\n' 'サーバ側で直pushを拒否できません。代わりに検知して記録しています。'
+            printf '%s\n' ''
+            printf '%s\n' '| 項目 | 値 |'
+            printf '%s\n' '|---|---|'
+            printf '| 実行者 | @%s |\n' "${ACTOR}"
+            printf '| コミット | `%s` |\n' "${GITHUB_SHA}"
+            printf '| 差分 | %s |\n' "${COMPARE_URL}"
+            printf '%s\n' ''
+            printf '%s\n' 'メッセージ:'
+            printf '%s\n' ''
+            printf '%s\n' '```'
+            printf '%s\n' "${COMMIT_MESSAGE}"
+            printf '%s\n' '```'
+            printf '%s\n' ''
+            printf '%s\n' '意図した作業（設定ファイルの微修正など）であれば、この Issue を閉じてください。'
+            printf '%s\n' '意図していなかった場合は、次の2点を確認してください。'
+            printf '%s\n' ''
+            printf '%s\n' '1. `git config core.hooksPath hooks` を実行しているか（未実行だとローカルの直push拒否が効きません）'
+            printf '%s\n' '2. `git push --no-verify` を使っていないか'
+          } > /tmp/main-push-alert.md
+
+          gh issue create \
+            --title "main へ直pushが行われました（${GITHUB_SHA:0:7}）" \
+            --body-file /tmp/main-push-alert.md
+
+          # 赤いチェックとしてコミットにも残す（Issue に気づかなくても履歴上で分かるようにする）
+          exit 1
